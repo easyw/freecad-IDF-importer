@@ -1,4 +1,15 @@
-- added IDF Importer v3.7 FreeCAD WorkBench to correctly import kicad IDF board and parts
+*IDF Importer WorkBench* for FreeCAD v3.9:
+ correctly importing of kicad IDF board and parts
+
+main improvements
+- removing step search associations (too old models)
+- displaying Flat Mode models
+- supporting Z position
+- skipping PROP in emp file
+- adding color to shapes opt IDF_colorize
+- adding emp library/single model load support
+- aligning IDF shape to both Geom and PartNBR
+
   to install the IDFImporter follow these instructions
   http://www.freecadweb.org/wiki/index.php?title=Installing_more_workbenches
   
