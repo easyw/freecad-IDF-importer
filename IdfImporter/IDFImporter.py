@@ -29,6 +29,8 @@ from math import *
 import ImportGui
 if FreeCAD.GuiUp:
     from PySide import QtCore, QtGui
+import time
+current_milli_time = lambda: int(round(time.time() * 1000))
 
 ##########################################################
 # Script base version dated 19-Jan-2012                  #
@@ -36,8 +38,8 @@ if FreeCAD.GuiUp:
 #Configuration parameters below - use standard slashes / #
 ##########################################################
 
-## updates December 2015 Maurice:
-IDF_ImporterVersion="3.9"
+## updates December 2016 Maurice:
+IDF_ImporterVersion="3.9.3"
 #  ignoring step search associations (too old models)
 #  displaying Flat Mode models
 #  checking version 3 for both Geometry and Part Number
@@ -59,7 +61,7 @@ IDF_ImporterVersion="3.9"
 #step_path=FreeCAD.getHomePath()+ "Mod/Idf/Idflibs/" #maui
 ##step_path=FreeCAD.getHomePath()+ "Mod/Idf/lib/"
 
-ignore_hole_size=0.45 # maui 0.5 # size in MM to prevent huge number of drilled holes
+ignore_hole_size=0.0 # maui 0.5 # size in MM to prevent huge number of drilled holes
 #EmpDisplayMode=2 # 0='Flat Lines', 1='Shaded', 2='Wireframe', 3='Points'; recommended 2 or 0
 EmpDisplayMode=0 # 0='Flat Lines', 1='Shaded', 2='Wireframe', 3='Points'; recommended 2 or 0 #maui
 
@@ -69,6 +71,7 @@ IDF_diag=0 # 0/1=disabled/enabled output (footprint.lst/missing_models.lst)
 IDF_diag_path="/tmp" # path for output of footprint.lst and missing_models.lst
 
 IDF_colorize=1 # 0/1 assign color to shapes
+start_time=0 #var start_time
 
 ########################################################################################
 #              End config section do not touch code below                              #
@@ -76,6 +79,12 @@ IDF_colorize=1 # 0/1 assign color to shapes
 
 pythonopen = __builtin__.open # to distinguish python built-in open function from the one declared here
 
+def PLine(prm1,prm2):
+    if hasattr(Part,"LineSegment"):
+        return Part.LineSegment(prm1, prm2)
+    else:
+        return Part.Line(prm1, prm2)
+        
 def open(filename):
     """called when freecad opens an Emn file"""
     docname = os.path.splitext(os.path.basename(filename))[0]
@@ -86,10 +95,16 @@ def open(filename):
     if (filename.endswith('.emp')):
         FreeCAD.Console.PrintMessage('idf model file')
         IDF_Type="IDF Library"
+        start_time=current_milli_time()
         process_emp_model(doc,filename)
     else:    
         IDF_Type="IDF assemblies "
+        start_time=current_milli_time()
         process_emn(doc,filename)
+        end_milli_time = current_milli_time()
+        running_time=(end_milli_time-start_time)/1000
+    msg="running time: "+str(running_time)+"sec\n"
+    FreeCAD.Console.PrintMessage(msg)
     msg="""<b>IDF Importer</b> version {0}<br><br>
            <b>{1}</b> file imported:<br><i>{2}</i><br><br>
            for <b>STEP</b> version visit <a href="http://sourceforge.net/projects/kicadstepup/">kicad StepUp</a>
@@ -222,7 +237,7 @@ def Process_board_outline(doc,board_outline,drills,board_thickness):
               out_shape.append(Part.Arc(per_point,mid_point(per_point,vertex,point[3]/2),vertex))
               out_shape.append(Part.Arc(per_point,mid_point(per_point,vertex,-point[3]/2),vertex))
            else:
-              out_shape.append(Part.Line(prev_vertex,vertex))
+              out_shape.append(PLine(prev_vertex,vertex))
        else:
           out_shape=Part.Shape(out_shape)
           out_shape=Part.Wire(out_shape.Edges)
@@ -406,11 +421,15 @@ def process_emp(doc,filename,placement,board_thickness):
      #FreeCAD.Console.PrintMessage(comps_list[idx][0])
      #FreeCAD.Console.PrintMessage(comps_list[idx][1])
      for item in comps_list:
-        #FreeCAD.Console.PrintMessage('\n'+place_item[1]+'pitem1'+place_item[2]+'pitem2\n')
-        #FreeCAD.Console.PrintMessage(item[1][1]);FreeCAD.Console.PrintMessage('\n')
+        FreeCAD.Console.PrintMessage('\n'+place_item[1]+'pitem1'+place_item[2]+'pitem2\n')
+        FreeCAD.Console.PrintMessage(item);FreeCAD.Console.PrintMessage('\n')
+        FreeCAD.Console.PrintMessage(item[0]);FreeCAD.Console.PrintMessage('\n')
+        FreeCAD.Console.PrintMessage(item[1][1]);FreeCAD.Console.PrintMessage('\n')
         #if (place_item[2] in item) and (place_item[1] in item[1][1]):
         ##if (place_item[2] in item) and (place_item[1] in item[1][1]):
-        if (place_item[1] in item) and (place_item[2] in item[1][1]):
+        #if (place_item[1].strip('"') in item[0].strip('"')) and (place_item[2].strip('"') in item[1][1].strip('"')):
+        #if (place_item[1].strip('"') in item[0].strip('"')) and (place_item[2].strip('"') in item[1][1].strip('"')):
+        if (place_item[1] in item[0]) and (place_item[2] in item[1][1]):
      #if comps.has_key(place_item[2]):
      #if comps.has_key(place_item[2]) and comps.has_key(place_item[1]): #1 maui
      #if comps_list[idx][0]==(place_item[2]) and comps_list[idx][1]==(place_item[1]): #1 maui
@@ -471,7 +490,7 @@ def Process_comp_outline(doc,comp_outline,comp_height):
             out_shape.append(Part.Arc(per_point,mid_point(per_point,vertex,point[2]/2),vertex))
             out_shape.append(Part.Arc(per_point,mid_point(per_point,vertex,-point[2]/2),vertex))
          else:
-            out_shape.append(Part.Line(prev_vertex,vertex))
+            out_shape.append(PLine(prev_vertex,vertex))
        prev_vertex=vertex
     out_shape=Part.Shape(out_shape)
     out_shape=Part.Wire(out_shape.Edges)
