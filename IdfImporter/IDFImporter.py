@@ -38,8 +38,8 @@ current_milli_time = lambda: int(round(time.time() * 1000))
 #Configuration parameters below - use standard slashes / #
 ##########################################################
 
-## updates December 2016 Maurice:
-IDF_ImporterVersion="3.9.3"
+## updates Jan 2018 Maurice:
+IDF_ImporterVersion="3.9.4"
 #  ignoring step search associations (too old models)
 #  displaying Flat Mode models
 #  checking version 3 for both Geometry and Part Number
@@ -97,6 +97,8 @@ def open(filename):
         IDF_Type="IDF Library"
         start_time=current_milli_time()
         process_emp_model(doc,filename)
+        end_milli_time = current_milli_time()
+        running_time=(end_milli_time-start_time)/1000
     else:    
         IDF_Type="IDF assemblies "
         start_time=current_milli_time()
