@@ -23,14 +23,19 @@
 #*   Milos Koutny 2010                                                     *
 #***************************************************************************/
 
-import FreeCAD, Part, os, FreeCADGui, __builtin__
+import FreeCAD, Part, os, FreeCADGui
 from FreeCAD import Base
 from math import *
 import ImportGui
 if FreeCAD.GuiUp:
     from PySide import QtCore, QtGui
 import time
+try:
+    import __builtin__ as builtin #py2
+except:
+    import builtins as builtin  #py3
 current_milli_time = lambda: int(round(time.time() * 1000))
+min_dist = 0.001 # 1/1000 mm
 
 ##########################################################
 # Script base version dated 19-Jan-2012                  #
@@ -38,8 +43,8 @@ current_milli_time = lambda: int(round(time.time() * 1000))
 #Configuration parameters below - use standard slashes / #
 ##########################################################
 
-## updates Jan 2018 Maurice:
-IDF_ImporterVersion="3.9.4"
+## updates Dec 2018 Maurice:
+IDF_ImporterVersion="3.9.5"
 #  ignoring step search associations (too old models)
 #  displaying Flat Mode models
 #  checking version 3 for both Geometry and Part Number
@@ -49,6 +54,9 @@ IDF_ImporterVersion="3.9.4"
 #  adding emp library/single model load support
 #  aligning IDF shape to both Geom and PartNBR for exactly match
 #  to do: .ROUTE_OUTLINE ECAD, .PLACE_OUTLINE MCAD, .ROUTE_KEPOUT ECAD, .PLACE_KEEPOUT ECAD
+def pdistance(p0, p1):
+    return sqrt((p0[0] - p1[0])**2 + (p0[1] - p1[1])**2)
+#
 
 
 ## path to table file (simple comma separated values)
@@ -77,7 +85,7 @@ start_time=0 #var start_time
 #              End config section do not touch code below                              #
 ########################################################################################
 
-pythonopen = __builtin__.open # to distinguish python built-in open function from the one declared here
+pythonopen = builtin.open # to distinguish python built-in open function from the one declared here
 
 def PLine(prm1,prm2):
     if hasattr(Part,"LineSegment"):
@@ -97,8 +105,6 @@ def open(filename):
         IDF_Type="IDF Library"
         start_time=current_milli_time()
         process_emp_model(doc,filename)
-        end_milli_time = current_milli_time()
-        running_time=(end_milli_time-start_time)/1000
     else:    
         IDF_Type="IDF assemblies "
         start_time=current_milli_time()
@@ -121,11 +127,11 @@ def open(filename):
 #####################################
 def infoDialog(msg):
     #QtGui.qApp.setOverrideCursor(QtCore.Qt.WaitCursor)
-    QtGui.qApp.restoreOverrideCursor()
+    QtGui.QApplication.restoreOverrideCursor()
     diag = QtGui.QMessageBox(QtGui.QMessageBox.Information,u"Info Message",msg )
     diag.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
     diag.exec_()
-    QtGui.qApp.restoreOverrideCursor()
+    QtGui.QApplication.restoreOverrideCursor()
     
 def insert(filename,docname):
     """called when freecad imports an Emn file"""
@@ -209,6 +215,7 @@ def process_emn(doc,filename):
           placement.append(place_item)
    FreeCAD.Console.PrintMessage("\n".join(passed_sections)+"\n")
    FreeCAD.Console.PrintMessage("Proceed "+str(Process_board_outline(doc,board_outline,drills,board_thickness))+" outlines\n")
+   FreeCADGui.SendMsgToActiveView("ViewFit")
    placement.sort(key=lambda param: (param[IDF_sort],param[0]))
    process_emp(doc,filename,placement,board_thickness)
    #place_steps(doc,placement,board_thickness) maui
@@ -238,7 +245,7 @@ def Process_board_outline(doc,board_outline,drills,board_thickness):
               per_point=Per_point(prev_vertex,vertex)
               out_shape.append(Part.Arc(per_point,mid_point(per_point,vertex,point[3]/2),vertex))
               out_shape.append(Part.Arc(per_point,mid_point(per_point,vertex,-point[3]/2),vertex))
-           else:
+           elif pdistance(prev_vertex,vertex) > min_dist:
               out_shape.append(PLine(prev_vertex,vertex))
        else:
           out_shape=Part.Shape(out_shape)
@@ -343,7 +350,10 @@ def process_emp(doc,filename,placement,board_thickness):
         if comp_PartNumber!="":
           if comp_height==0:
             comp_height=0.1 
-          comps.append((comp_PartNumber,[Process_comp_outline(doc,comp_outline,comp_height),comp_GeometryName]))
+          try:
+            comps.append((comp_PartNumber,[Process_comp_outline(doc,comp_outline,comp_height),comp_GeometryName]))
+          except:
+            FreeCAD.Console.PrintError('\nERROR in modeling component\n')
           #comps.append((comp_GeometryName,[Process_comp_outline(doc,comp_outline,comp_height),comp_PartNumber])) #maui
           #FreeCAD.Console.PrintMessage(comps)
           comp_PartNumber=""
@@ -491,7 +501,7 @@ def Process_comp_outline(doc,comp_outline,comp_height):
             per_point=Per_point(prev_vertex,vertex)
             out_shape.append(Part.Arc(per_point,mid_point(per_point,vertex,point[2]/2),vertex))
             out_shape.append(Part.Arc(per_point,mid_point(per_point,vertex,-point[2]/2),vertex))
-         else:
+         elif pdistance(prev_vertex,vertex) > min_dist:
             out_shape.append(PLine(prev_vertex,vertex))
        prev_vertex=vertex
     out_shape=Part.Shape(out_shape)
